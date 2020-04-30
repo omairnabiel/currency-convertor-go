@@ -1,7 +1,15 @@
 package main
 
-import "fmt"
+import (
+	"github.com/gin-gonic/gin"
+	process "zlack-home/process"
+)
 
 func main() {
-	fmt.Println("hello world")
+	// Init router
+	router := gin.New()
+
+	router.GET("/process-transactions", process.Process)
+
+	router.Run(":8080")
 }
