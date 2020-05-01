@@ -6,7 +6,12 @@ import (
 	"net/http"
 	"encoding/json"
 	"time"
+	"math"
 )
+
+func roundTo(n float64, decimals uint32) float64 {
+    return math.Round(n * float64(decimals)) / float64(decimals)
+}
 
 func prettyPrint(i interface{}) string {
     s, _ := json.MarshalIndent(i, "", "\t")
@@ -35,6 +40,13 @@ type exchangeRate struct {
 	Rates map[string] float64
 }
 
+type processedTransaction struct {
+	CreatedAt time.Time
+	Currency string
+	ConvertedAmount float64
+	Checksum string
+}
+
 func getSingleTransaction() (unprocessedTransaction, error) {
 	url := "https://7np770qqk5.execute-api.eu-west-1.amazonaws.com/prod/get-transaction"
 	t := new(unprocessedTransaction)
@@ -44,10 +56,19 @@ func getSingleTransaction() (unprocessedTransaction, error) {
 
 func getExchangeRates(t unprocessedTransaction, base string) (exchangeRate, error) {
 	url := fmt.Sprintf("https://api.exchangeratesapi.io/%s?base=%s", t.CreatedAt.Format("2006-01-02"), base)
-	fmt.Print(url)
 	er := new(exchangeRate)
 	err := getJSON(url, &er)
 	return *er, err
+}
+
+func processTransaction(ut unprocessedTransaction, er exchangeRate) (processedTransaction) {
+	pt := new(processedTransaction)
+	pt.Checksum = ut.Checksum
+	pt.CreatedAt = ut.CreatedAt
+	pt.Currency = ut.Currency
+	pt.ConvertedAmount = roundTo(ut.Amount / er.Rates[ut.Currency], 4)
+	
+	return *pt
 }
 
 /* Process */
@@ -64,4 +85,6 @@ func Process(ctx *gin.Context) {
 	} else {
 		fmt.Print(prettyPrint(rate))
 	}
+	pt := processTransaction(t, rate)
+	fmt.Print(prettyPrint(pt))
 }
