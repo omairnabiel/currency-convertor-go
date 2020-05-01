@@ -61,30 +61,30 @@ func getExchangeRates(t unprocessedTransaction, base string) (exchangeRate, erro
 	return *er, err
 }
 
-func processTransaction(ut unprocessedTransaction, er exchangeRate) (processedTransaction) {
+func makeSingleProcessedTransaction(base string) (processedTransaction) {
+	ut, err := getSingleTransaction()
+	if err != nil {
+		fmt.Print("ERROR")
+	} else {
+		fmt.Print(prettyPrint(ut))
+	}
+	r, err := getExchangeRates(ut, base)
+	if err != nil {
+		fmt.Print("ERROR")
+	} else {
+		fmt.Print(prettyPrint(r))
+	}
 	pt := new(processedTransaction)
 	pt.Checksum = ut.Checksum
 	pt.CreatedAt = ut.CreatedAt
 	pt.Currency = ut.Currency
-	pt.ConvertedAmount = roundTo(ut.Amount / er.Rates[ut.Currency], 4)
-	
+	pt.ConvertedAmount = roundTo(ut.Amount / r.Rates[ut.Currency], 4)
+	fmt.Print(prettyPrint(pt))
+
 	return *pt
 }
 
 /* Process */
 func Process(ctx *gin.Context) {
-	t, err := getSingleTransaction()
-	if err != nil {
-		fmt.Print("ERROR")
-	} else {
-		fmt.Print(prettyPrint(t))
-	}
-	rate, err := getExchangeRates(t, "EUR")
-	if err != nil {
-		fmt.Print("ERROR")
-	} else {
-		fmt.Print(prettyPrint(rate))
-	}
-	pt := processTransaction(t, rate)
-	fmt.Print(prettyPrint(pt))
+	makeSingleProcessedTransaction("EUR")
 }
