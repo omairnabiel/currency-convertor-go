@@ -1,6 +1,7 @@
 package process
 
 import (
+	"bytes"
 	"github.com/gin-gonic/gin"
 	"fmt"
 	"net/http"
@@ -41,10 +42,20 @@ type exchangeRate struct {
 }
 
 type processedTransaction struct {
-	CreatedAt time.Time
-	Currency string
-	ConvertedAmount float64
-	Checksum string
+	CreatedAt time.Time 		`json:"createdAt"`
+	Currency string 			`json:"currency"`
+	ConvertedAmount float64		`json:"convertedAmount"`
+	Checksum string				`json:"checksum"`
+}
+
+type postProcessTransaction struct {
+	Transactions [] processedTransaction `json:"transactions"`
+}
+
+type postProcessResponse struct {
+	Success bool
+	Passed int64
+	Failed int64
 }
 
 func getSingleTransaction() (unprocessedTransaction, error) {
@@ -86,5 +97,29 @@ func makeSingleProcessedTransaction(base string) (processedTransaction) {
 
 /* Process */
 func Process(ctx *gin.Context) {
-	makeSingleProcessedTransaction("EUR")
+	ppt := new(postProcessTransaction)
+
+	ppt.Transactions = [] processedTransaction{}
+
+	for i := 0; i < 10; i++ {
+		ppt.Transactions = append(ppt.Transactions, makeSingleProcessedTransaction("EUR"))
+	}
+
+	url := "https://7np770qqk5.execute-api.eu-west-1.amazonaws.com/prod/process-transactions"
+
+	s, _ := json.Marshal(ppt);
+
+	r, err := http.Post(url, "application/json", bytes.NewBuffer(s))
+
+	if err != nil {
+		fmt.Print("ERROR")
+	} else {
+		defer r.Body.Close()
+
+		ppr := new(postProcessResponse)
+
+		json.NewDecoder(r.Body).Decode(ppr)
+
+		fmt.Print(prettyPrint(ppr))
+	}
 }
