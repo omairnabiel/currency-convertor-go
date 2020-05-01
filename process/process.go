@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"encoding/json"
+	"time"
 )
 
 func prettyPrint(i interface{}) string {
@@ -23,26 +24,44 @@ func getJSON(url string, target interface{}) error {
 }
 
 type unprocessedTransaction struct {
-	CreatedAt string
+	CreatedAt time.Time
 	Currency string
 	Amount float64
 	ExchangeURL string
 	Checksum string
 }
 
-func getSingleTransaction() (unprocessedTransaction, error) {
-	url := "https://7np770qqk5.execute-api.eu-west-1.amazonaws.com/prod/get-transaction"
-	transaction := new(unprocessedTransaction)
-	err := getJSON(url, &transaction)
-	return *transaction, err
+type exchangeRate struct {
+	Rates map[string] float64
 }
 
-/* Get and Process transactions */
+func getSingleTransaction() (unprocessedTransaction, error) {
+	url := "https://7np770qqk5.execute-api.eu-west-1.amazonaws.com/prod/get-transaction"
+	t := new(unprocessedTransaction)
+	err := getJSON(url, &t)
+	return *t, err
+}
+
+func getExchangeRates(t unprocessedTransaction, base string) (exchangeRate, error) {
+	url := fmt.Sprintf("https://api.exchangeratesapi.io/%s?base=%s", t.CreatedAt.Format("2006-01-02"), base)
+	fmt.Print(url)
+	er := new(exchangeRate)
+	err := getJSON(url, &er)
+	return *er, err
+}
+
+/* Process */
 func Process(ctx *gin.Context) {
-	transaction, err := getSingleTransaction()
+	t, err := getSingleTransaction()
 	if err != nil {
 		fmt.Print("ERROR")
 	} else {
-		fmt.Print(prettyPrint(transaction))
+		fmt.Print(prettyPrint(t))
+	}
+	rate, err := getExchangeRates(t, "EUR")
+	if err != nil {
+		fmt.Print("ERROR")
+	} else {
+		fmt.Print(prettyPrint(rate))
 	}
 }
