@@ -10,8 +10,9 @@ import (
 	"math"
 )
 
-func roundTo(n float64, decimals uint32) float64 {
-    return math.Round(n * float64(decimals)) / float64(decimals)
+func roundTo(n float64, decimals int) float64 {
+	exp := math.Pow10(decimals)
+    return math.Round(n * exp) / exp
 }
 
 func prettyPrint(i interface{}) string {
@@ -66,7 +67,7 @@ func getSingleTransaction() (unprocessedTransaction, error) {
 }
 
 func getExchangeRates(t unprocessedTransaction, base string) (exchangeRate, error) {
-	url := fmt.Sprintf("https://api.exchangeratesapi.io/%s?base=%s", t.CreatedAt.Format("2006-01-02"), base)
+	url := fmt.Sprintf("https://api.exchangeratesapi.io/%s?base=%s", t.CreatedAt.UTC().Format("2006-01-02"), base)
 	er := new(exchangeRate)
 	err := getJSON(url, &er)
 	return *er, err
