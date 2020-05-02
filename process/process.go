@@ -73,13 +73,7 @@ func getExchangeRates(t unprocessedTransaction, base string) (exchangeRate, erro
 	return *er, err
 }
 
-func makeSingleProcessedTransaction(base string) (processedTransaction) {
-	ut, err := getSingleTransaction()
-	if err != nil {
-		fmt.Print("ERROR")
-	} else {
-		fmt.Print(prettyPrint(ut))
-	}
+func makeSingleProcessedTransaction(base string, ut unprocessedTransaction) (processedTransaction) {
 	r, err := getExchangeRates(ut, base)
 	if err != nil {
 		fmt.Print("ERROR")
@@ -96,14 +90,20 @@ func makeSingleProcessedTransaction(base string) (processedTransaction) {
 	return *pt
 }
 
-/* Process */
+/* Process returns nothing*/
 func Process(ctx *gin.Context) {
 	ppt := new(postProcessTransaction)
 
 	ppt.Transactions = [] processedTransaction{}
 
 	for i := 0; i < 10; i++ {
-		ppt.Transactions = append(ppt.Transactions, makeSingleProcessedTransaction("EUR"))
+		ut, err := getSingleTransaction()
+		if err != nil {
+			fmt.Print("ERROR")
+		} else {
+			fmt.Print(prettyPrint(ut))
+		}
+		ppt.Transactions = append(ppt.Transactions, makeSingleProcessedTransaction("EUR", ut))
 	}
 
 	url := "https://7np770qqk5.execute-api.eu-west-1.amazonaws.com/prod/process-transactions"
