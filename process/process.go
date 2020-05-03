@@ -10,6 +10,11 @@ import (
 	"math"
 )
 
+func timeTrack(start time.Time, name string) {
+	elapsed := time.Since(start)
+	fmt.Printf("function %s took %s", name, elapsed)
+}
+
 func roundTo(n float64, decimals int) float64 {
 	exp := math.Pow10(decimals)
     return math.Round(n * exp) / exp
@@ -102,16 +107,21 @@ func processNTransactions(base string, pCh chan processedTransaction) {
 
 /* Process returns nothing*/
 func Process(ctx *gin.Context) {
+	defer timeTrack(time.Now(), "Process")
 	ppt := new(postProcessTransaction)
 
 	ppt.Transactions = [] processedTransaction{}
 
+	ch := make(chan processedTransaction)
 	for i := 0; i < 10; i++ {
-		ch := make(chan processedTransaction)
 		go processNTransactions("EUR", ch)
-		pt := <- ch
-		ppt.Transactions = append(ppt.Transactions, pt)
 	}
+
+	for i := 0; i < 10; i++ {
+		ppt.Transactions = append(ppt.Transactions, <- ch)
+	}
+
+	fmt.Print(prettyPrint(ppt))
 
 	url := "https://7np770qqk5.execute-api.eu-west-1.amazonaws.com/prod/process-transactions"
 
