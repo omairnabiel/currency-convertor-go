@@ -10,6 +10,11 @@ import (
 	"math"
 )
 
+func timeTrack(start time.Time, name string) {
+	elapsed := time.Since(start)
+	fmt.Printf("function %s took %s", name, elapsed)
+}
+
 func roundTo(n float64, decimals int) float64 {
 	exp := math.Pow10(decimals)
     return math.Round(n * exp) / exp
@@ -59,10 +64,11 @@ type postProcessResponse struct {
 	Failed int64
 }
 
-func getSingleTransaction() (unprocessedTransaction, error) {
+func getSingleTransaction(ch chan unprocessedTransaction) (unprocessedTransaction, error) {
 	url := "https://7np770qqk5.execute-api.eu-west-1.amazonaws.com/prod/get-transaction"
 	t := new(unprocessedTransaction)
 	err := getJSON(url, &t)
+	ch <- *t
 	return *t, err
 }
 
@@ -73,13 +79,8 @@ func getExchangeRates(t unprocessedTransaction, base string) (exchangeRate, erro
 	return *er, err
 }
 
-func makeSingleProcessedTransaction(base string) (processedTransaction) {
-	ut, err := getSingleTransaction()
-	if err != nil {
-		fmt.Print("ERROR")
-	} else {
-		fmt.Print(prettyPrint(ut))
-	}
+func processSingleTransaction(base string, ch chan unprocessedTransaction, pCh chan processedTransaction) (processedTransaction, error) {
+	ut := <- ch
 	r, err := getExchangeRates(ut, base)
 	if err != nil {
 		fmt.Print("ERROR")
@@ -93,18 +94,34 @@ func makeSingleProcessedTransaction(base string) (processedTransaction) {
 	pt.ConvertedAmount = roundTo(ut.Amount / r.Rates[ut.Currency], 4)
 	fmt.Print(prettyPrint(pt))
 
-	return *pt
+	pCh <- *pt
+
+	return *pt, err
 }
 
-/* Process */
+func processNTransactions(base string, pCh chan processedTransaction) {
+	utCh := make(chan unprocessedTransaction)
+	go getSingleTransaction(utCh)
+	go processSingleTransaction(base, utCh, pCh)
+}
+
+/* Process returns nothing*/
 func Process(ctx *gin.Context) {
+	defer timeTrack(time.Now(), "Process")
 	ppt := new(postProcessTransaction)
 
 	ppt.Transactions = [] processedTransaction{}
 
+	ch := make(chan processedTransaction)
 	for i := 0; i < 10; i++ {
-		ppt.Transactions = append(ppt.Transactions, makeSingleProcessedTransaction("EUR"))
+		go processNTransactions("EUR", ch)
 	}
+
+	for i := 0; i < 10; i++ {
+		ppt.Transactions = append(ppt.Transactions, <- ch)
+	}
+
+	fmt.Print(prettyPrint(ppt))
 
 	url := "https://7np770qqk5.execute-api.eu-west-1.amazonaws.com/prod/process-transactions"
 
