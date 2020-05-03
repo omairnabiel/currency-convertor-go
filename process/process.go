@@ -59,10 +59,11 @@ type postProcessResponse struct {
 	Failed int64
 }
 
-func getSingleTransaction() (unprocessedTransaction, error) {
+func getSingleTransaction(ch chan unprocessedTransaction) (unprocessedTransaction, error) {
 	url := "https://7np770qqk5.execute-api.eu-west-1.amazonaws.com/prod/get-transaction"
 	t := new(unprocessedTransaction)
 	err := getJSON(url, &t)
+	ch <- *t
 	return *t, err
 }
 
@@ -73,7 +74,8 @@ func getExchangeRates(t unprocessedTransaction, base string) (exchangeRate, erro
 	return *er, err
 }
 
-func makeSingleProcessedTransaction(base string, ut unprocessedTransaction) (processedTransaction) {
+func processSingleTransaction(base string, ch chan unprocessedTransaction, pCh chan processedTransaction) (processedTransaction, error) {
+	ut := <- ch
 	r, err := getExchangeRates(ut, base)
 	if err != nil {
 		fmt.Print("ERROR")
@@ -87,7 +89,15 @@ func makeSingleProcessedTransaction(base string, ut unprocessedTransaction) (pro
 	pt.ConvertedAmount = roundTo(ut.Amount / r.Rates[ut.Currency], 4)
 	fmt.Print(prettyPrint(pt))
 
-	return *pt
+	pCh <- *pt
+
+	return *pt, err
+}
+
+func processNTransactions(base string, pCh chan processedTransaction) {
+	utCh := make(chan unprocessedTransaction)
+	go getSingleTransaction(utCh)
+	go processSingleTransaction(base, utCh, pCh)
 }
 
 /* Process returns nothing*/
@@ -97,13 +107,10 @@ func Process(ctx *gin.Context) {
 	ppt.Transactions = [] processedTransaction{}
 
 	for i := 0; i < 10; i++ {
-		ut, err := getSingleTransaction()
-		if err != nil {
-			fmt.Print("ERROR")
-		} else {
-			fmt.Print(prettyPrint(ut))
-		}
-		ppt.Transactions = append(ppt.Transactions, makeSingleProcessedTransaction("EUR", ut))
+		ch := make(chan processedTransaction)
+		go processNTransactions("EUR", ch)
+		pt := <- ch
+		ppt.Transactions = append(ppt.Transactions, pt)
 	}
 
 	url := "https://7np770qqk5.execute-api.eu-west-1.amazonaws.com/prod/process-transactions"
